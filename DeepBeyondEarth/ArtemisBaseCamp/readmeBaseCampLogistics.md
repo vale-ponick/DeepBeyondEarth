@@ -7,74 +7,75 @@
 
 import Foundation
  
-ТТЗ №1: Склад снабжения лунной базы (ArtemisBaseCamp)
-Отрабатываемые связки
-5️⃣ Code Structuring (mutating, extension, инкапсуляция состояния)
+ТТЗ №1: Склад базового лагеря - 'ArtemisBaseCamp'
 
-6️⃣ Errors & Handling (enum Error, throws, do-catch)
+Отрабатываемые связки:
+    5️⃣ Code Structuring (mutating, extension, инкапсуляция состояния)
 
-9️⃣ Clean Code (защита свойств через private(set), разделение логики и вывода)
+    6️⃣ Errors & Handling (enum Error, throws, do-catch)
 
-1. Легенда миссии
-На Южном полюсе Луны разворачивается модуль снабжения базового лагеря «Артемида». Грузовой шлюз принимает герметичные контейнеры с ресурсами (вода, кислород, научное оборудование) и выдает их экипажу. Из-за жёстких ограничений по массе и объёму складской отсек имеет строгий лимит вместимости, а бортовой компьютер блокирует любые некорректные операции приёмки и выдачи.
+    9️⃣ Clean Code (защита свойств через private(set), разделение логики и вывода)
+
+1. Контекст и правила системы
+На Южном полюсе Луны разворачивается модуль снабжения базового лагеря 'Артемида'. Грузовой шлюз принимает герметичные контейнеры с ресурсами (вода, кислород, научное оборудование) и выдает их экипажу. Из-за жёстких ограничений по массе и объёму складской отсек имеет строгий лимит вместимости, а бортовой компьютер блокирует любые некорректные операции приёмки и выдачи. Внутри модели запрет использования print() - методы тольео меняют данные или выбрасывают ошибки. Очистка пробелов по краям (trim) выаолняется ДО проверки имени.
 
 2. Архитектурные требования
-А. Перечисление ошибок LogisticsError: LocalizedError — ровно 5 кейсов
+А. Перечисление ошибок LogisticsError: LocalizedError — строго 5 кейсов
 #    Кейс    Когда возникает
-1    emptyName    имя после trim — пустая строка
-2    invalidAmount(amount: Int)    количество <= 0
-3    capacityExceeded(available: Int, requested: Int)    загрузка + amount > maxCapacity
-4    resourceNotFound(name: String)    при dispatch ключа нет в словаре
-5    insufficientStock(available: Int, requested: Int)    при dispatch остаток < amount
+1    emptyName    имя после trim — пустое название груза (или строка только из пробелов) - ПОСЛЕ обрезкт пробелов по краям
+2    invalidAmount(amount: Int)    количество <= 0 - некорректное кол-во
+3    capacityExceed(available: Int, requested: Int)  превышение max вместимости склада при приемке - сумма текущего груза + нового > maxCapacity
+4    resourceNotFound(name: String)   попытка выдать ресурс, ключа которого вообще нет на сскладе
+5    insufficientStock(available: Int, requested: Int)    ЕСТЬ ресурс на складе, НО остатка НЕ хватает при выдаче < amount
 errorDescription — для каждого кейса.
 
-Б. Модель склада BaseCampStorage
-Свойства:
+Б. Модель склада 'BaseCampStorage'
+Свойства(хранение):
 
-text
-let maxCapacity: Int                 — задаётся при создании, не меняется
-private(set) var resources: [String: Int]   — словарь, меняется только внутри
-private(set) — только на resources. maxCapacity — let, private(set) не нужен.
+    let maxCapacity: Int — max вместимость - задаётся при создании, закрыта на запись private(set)
+    private(set) var inventory: [String: Int]   — словарь ресурсов, закрыт на запись извне
 
-Computed properties:
+Вычисляемык свойства - Computed properties:
 
-text
-var currentLoad: Int         — сумма всех значений словаря
-var freeSpace: Int           — maxCapacity - currentLoad
-var isFull: Bool             — freeSpace == 0
+    var currentLoad: Int — текущая загрузка  - сумма всех единиц ресурсов на складе)
+    var availableSpace: Int - свободное место (остаток до max) = maxCapacity - currentLoad
+    var isFull: Bool - TRUE, если свободного места 0  availableSpase == 0
 В. Методы управления (mutating + throws)
-receive(name: String, amount: Int) throws:
 
-let key = name.trimmingCharacters(in: .whitespaces) — trim до проверки;
+receive(name: String, amount: Int) throws: - проверяет имя, кол-во Ю 0 и наличие свободного места. Прибавляет груз в словарь.
+    Барьеры: 1. очистка пробелов(trim) и проверка !key.isEmpty
+             2. amount > 0 (invalidAmount)
+             3. currentLoad + amount <= maxCapacity
 
-guard !key.isEmpty → throw .emptyName;
+    let key = name.trimmingCharacters(in: .whitespaces) — trim до проверки;
 
-guard amount > 0 → throw .invalidAmount(amount:);
+    guard !key.isEmpty → throw .emptyName;
 
-guard currentLoad + amount <= maxCapacity → throw .capacityExceeded(available: freeSpace, requested: amount);
+    guard amount > 0 → throw .invalidAmount(amount:);
 
-resources[key, default: 0] += amount — в словарь идёт key (trimmed).
+    guard currentLoad + amount <= maxCapacity → throw .capacityExceeded(available: freeSpace, requested: amount);
 
-dispatch(name: String, amount: Int) throws:
+    resources[key, default: 0] += amount — в словарь идёт key (trimmed).
 
-let key = name.trimmingCharacters(in: .whitespaces);
+dispatch(name: String, amount: Int) throws: - ВЫДАЧА - проверяет имя, кол-во Ю 0, наличие ключа и достаточный остаток. Вычитает груз. ВАЖНО: если остаток стал < 0 то ключ удаляется из словаря.
 
-guard !key.isEmpty → throw .emptyName;
+    let key = name.trimmingCharacters(in: .whitespaces);
 
-guard amount > 0 → throw .invalidAmount(amount:);
+    guard !key.isEmpty → throw .emptyName;
 
-guard let stock = resources[key] → throw .resourceNotFound(name: key);
+    guard amount > 0 → throw .invalidAmount(amount:);
 
-guard stock >= amount → throw .insufficientStock(available: stock, requested: amount);
+    guard let stock = resources[key] → throw .resourceNotFound(name: key);
 
-if stock == amount { resources.removeValue(forKey: key) } else { resources[key] = stock - amount } — ключ удаляется при нуле.
+    guard stock >= amount → throw .insufficientStock(available: stock, requested: amount);
 
-print() внутри модели запрещён — только throw или изменение состояния.
+    if stock == amount { resources.removeValue(forKey: key) } else { resources[key] = stock - amount } — ключ удаляется при нуле.
 
-Г. Расширение extension BaseCampStorage
-func report() -> String — формат фиксирован:
+    ВАЖНО: print() внутри модели запрещён — только throw или изменение состояния.
 
-text
+Г. Расширение - extension BaseCampStorage
+func report() -> String — метод формирования текст. отчета о состоянии склада (занято/свободно/список позиций) формат фиксирован: возвращает ЕДИНУЮ строку состояния склада
+
 "Storage: 120/500, free: 380, items: RTG(2), Food(10), Water(5)"
 если словарь пуст: "Storage: 0/500, free: 500, items: —";
 
@@ -83,38 +84,43 @@ text
 3. План работы
 Псевдокод — выполнен (см. раздел 4 ниже). Отдельно писать не нужно.
 
-baseCampLogistics.swift — реализация LogisticsError и BaseCampStorage полностью самостоятельно.
+    baseCampLogistics.swift — реализация LogisticsError и BaseCampStorage полностью самостоятельно.
 
-testsBaseCampLogistics.swift — проверки всех позитивных и негативных сценариев.
+    testsBaseCampLogistics.swift — проверки всех позитивных и негативных сценариев.
 
 4. Алгоритмы (IPO) — для справки
 receive (Вход → Барьеры → Изменение состояния)
-text
+
 Вход: name, amount
 Барьер 1: trim(name) → key; key не пуст?
 Барьер 2: amount > 0?
 Барьер 3: currentLoad + amount <= maxCapacity?
 Действие: resources[key, default: 0] += amount
+
 dispatch
-text
+
 Вход: name, amount
 Барьер 1: trim(name) → key; key не пуст?
 Барьер 2: amount > 0?
 Барьер 3: resources[key] существует?
 Барьер 4: resources[key] >= amount?
+
 Действие:
   если stock == amount → resources.removeValue(forKey: key)
   иначе → resources[key] = stock - amount
-5. Чек-лист тестов (testsBaseCampLogistics.swift)
+
+5. Чек-лист тестов  - testsBaseCampLogistics.swift
 Позитивные:
 
-Успешная приёмка — новый ресурс + пополнение существующего.
+    Успешная приёмка — добавление нового ресурса + пополнение существующего. Приемка имени с пробелами по краям  - "  water  " -> as "water"
 
-Частичная выдача — остаток уменьшается, ключ остаётся.
+    Частичная выдача — остаток уменьшается, ключ остаётся в словаре.
 
-Полная выдача под ноль — ключ удаляется из словаря.
+    Полная выдача под ноль — остаток обнуляется, ключ удаляется из словаря.
 
-Негативные — по одному do/catch на каждый кейс:
+    Негативные — по одному do/catch (или проверке) на каждый из 5 кейсов LogisticError:
+    
+    Проверка report() - сверка формата строки для пустого и заполненого склада
 
 Кейс    Что проверить
 emptyName    receive(name: " ", amount: 10) и dispatch
@@ -124,16 +130,6 @@ resourceNotFound    dispatch несуществующего ключа
 insufficientStock    dispatch больше, чем есть
 Дополнительно: trim — receive(name: " RTG ", amount: 2), затем dispatch(name: "RTG", amount: 1) — должен найти тот же ключ.
 
-Изменения по сравнению с исходным ТЗ
-5 кейсов зафиксированы явно — раньше было 4 пункта, но третий и четвёртый — по два кейса.
-
-maxCapacity — let, private(set) — только на resources.
-
-Trim до проверки; в словарь идёт trimmed имя.
-
-Формат report() задан примером.
-
-Псевдокод помечен как выполненный — не дублируется.
 
 
 Что важно учесть, чтобы не потерять самостоятельность
