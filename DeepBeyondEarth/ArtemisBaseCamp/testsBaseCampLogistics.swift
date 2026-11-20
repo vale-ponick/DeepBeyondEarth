@@ -11,7 +11,7 @@ func runBaseCampStorageTests() {
     var storage = BaseCampStorage(maxCapacity: 100)
     // Positive scenario
     do {
-        // Arrenge - подготовка данных
+        // Arrange - подготовка данных
         assert(storage.currentLoad == 0, "Initial  загрузка склада must be 0")
         
         // Act (действие)
@@ -21,7 +21,7 @@ func runBaseCampStorageTests() {
         
         try storage.dispatch(name: "Sensor", amount: 5)
         
-        assert(storage.currentLoad == 32, "Expected reseive 32")
+        assert(storage.currentLoad == 32, "Expected receive 32")
         assert(storage.resources["Sensor"] == nil, "Key 'Sensor' must be dispatch")
         
         assert(storage.report() == "Storage: 32/100, free: 68, items: Food(12), Oxygen(20)", "Incorrect format of report")
@@ -45,21 +45,21 @@ func runBaseCampStorageTests() {
         var s = BaseCampStorage(maxCapacity: 100)
         try s.dispatch(name: "  ", amount: 5)
         assertionFailure("Expected emptyName")
-    } catch LogisticsError.emptyName {} catch { assertionFailure() }
+    } catch LogisticsError.emptyName {} catch { assertionFailure("Unexpected error: \(error)") }
     
     // 🐞 invalidAmount — 0
     do {
         var s = BaseCampStorage(maxCapacity: 100)
         try s.receive(name: "Water", amount: 0)
         assertionFailure("Expected invalidAmount")
-    } catch LogisticsError.invalidAmount(let a) { assert(a == 0) } catch { assertionFailure() }
+    } catch LogisticsError.invalidAmount(let a) { assert(a == 0) } catch { assertionFailure("Unexpected error: \(error)") }
     
     // 🐞 invalidAmount — -5
     do {
         var s = BaseCampStorage(maxCapacity: 100)
         try s.receive(name: "Water", amount: -5)
         assertionFailure("Expected invalidAmount")
-    } catch LogisticsError.invalidAmount(let a) { assert(a == -5) } catch { assertionFailure() }
+    } catch LogisticsError.invalidAmount(let a) { assert(a == -5) } catch { assertionFailure("Unexpected error: \(error)") }
     
     // 🐞 capacityExceeded
     do {
@@ -68,14 +68,14 @@ func runBaseCampStorageTests() {
         assertionFailure("Expected capacityExceeded")
     } catch LogisticsError.capacityExceeded(let free, let req) {
         assert(free == 10); assert(req == 11)
-    } catch { assertionFailure() }
+    } catch { assertionFailure("Unexpected error: \(error)") }
     
     // 🐞 resourceNotFound
     do {
         var s = BaseCampStorage(maxCapacity: 100)
         try s.dispatch(name: "Gold", amount: 1)
         assertionFailure("Expected resourceNotFound")
-    } catch LogisticsError.resourceNotFound(let n) { assert(n == "Gold") } catch { assertionFailure() }
+    } catch LogisticsError.resourceNotFound(let n) { assert(n == "Gold") } catch { assertionFailure("Unexpected error: \(error)") }
     
     // 🐞 insufficientStock
     do {
@@ -85,7 +85,7 @@ func runBaseCampStorageTests() {
         assertionFailure("Expected insufficientStock")
     } catch LogisticsError.insufficientStock(let a, let r) {
         assert(a == 5); assert(r == 10)
-    } catch { assertionFailure() }
+    } catch { assertionFailure("Unexpected error: \(error)") }
     
     // 🐞 trim — " RTG " → "RTG"
     do {
@@ -95,7 +95,7 @@ func runBaseCampStorageTests() {
         assert(s.resources[" RTG "] == nil)
         try s.dispatch(name: "RTG", amount: 1)
         assert(s.resources["RTG"] == 1)
-    } catch { assertionFailure() }
+    } catch { assertionFailure("Unexpected error: \(error)") }
     
     // 🐞 partial dispatch — остаток не 0, ключ остался
     do {
@@ -103,8 +103,11 @@ func runBaseCampStorageTests() {
         try s.receive(name: "Water", amount: 10)
         try s.dispatch(name: "Water", amount: 3)
         assert(s.resources["Water"] == 7)
-    } catch { assertionFailure() }
+    } catch { assertionFailure("Unexpected error: \(error)") }
+    print("✅ Все 11 тестов ArtemisBaseCamp пройдены!")
 }
 /**
  ✅ Позитивный тест пройден!
+ ✅ Все 11 тестов ArtemisBaseCamp пройдены!
+ Program ended with exit code: 0
  */
