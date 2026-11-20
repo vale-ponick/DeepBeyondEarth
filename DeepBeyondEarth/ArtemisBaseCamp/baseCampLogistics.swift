@@ -90,7 +90,7 @@ struct BaseCampStorage {
     
     extension BaseCampStorage {
         func report() -> String {
-            let itemList = resources.isEmpty ? "--" : resources.sorted { $0.key < $1.key }.map { "\($0.key)(\($0.value))" }.joined(separator: ", ")
+            let itemList = resources.isEmpty ? "—" : resources.sorted { $0.key < $1.key }.map { "\($0.key)(\($0.value))" }.joined(separator: ", ")
             return "Storage: \(currentLoad)/\(maxCapacity), free: \(freeSpace), items: \(itemList)"
     }
 }
